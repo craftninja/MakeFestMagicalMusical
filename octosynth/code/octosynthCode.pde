@@ -1,10 +1,15 @@
-// OCTOSynth-0.2 
-// 
+// Make sure the following are selected:
+//   Programmer: AVRISP mkll
+//   Board: Ardiuno/Genuino Uno
+//   Port: not the bluetooth one, there should be another listed
+
+// OCTOSynth-0.2
+//
 // Joe Marshall 2011
 // Resonant filter based on Meeblip (meeblip.noisepages.com)
 // Interrupt setup code based on code by Martin Nawrath (http://interface.khm.de/index.php/lab/experiments/arduino-dds-sinewave-generator/)
 // oscillators and inline assembler optimisation by me.
-// 
+//
 // key input is from 8 capacitive inputs on digital input 6,7, and analog inputs 0-6
 // each input is a single wire, going to something metal to touch
 // (I used a bunch of big carriage bolts)
@@ -12,15 +17,15 @@
 // sensing of this is done by getNoteKeys, using the method described at:
 // http://www.arduino.cc/playground/Code/CapacitiveSensor
 //
-// I use assembler with an unrolled loop using 16 registers to detect this 
+// I use assembler with an unrolled loop using 16 registers to detect this
 // this makes things much more accurate than the C loop described on the link above
-// as we are measuring the relevant delay in single processor cycles. 
-// It seems to be happy even with battery power, detecting up to 8 concurrent 
+// as we are measuring the relevant delay in single processor cycles.
+// It seems to be happy even with battery power, detecting up to 8 concurrent
 // touches.
 
 // The waves are all defined at the very top, because we are forcing them to align to 256 byte boundaries
 // doing this makes the oscillator code quicker (as calculating a wave offset is just
-// a matter of replacing the low byte of the address). 
+// a matter of replacing the low byte of the address).
 // Having said that, other arduino stuff probably gets loaded in here first
 // because the aligned attribute seems to add a couple of hundred bytes to the code
 
@@ -32,77 +37,77 @@
 
 // table of 256 sine values / one sine period / stored in flash memory
 char sine256[256]  __attribute__ ((aligned(256))) = {
-0 , 3 , 6 , 9 , 12 , 15 , 18 , 21 , 24 , 27 , 30 , 33 , 36 , 39 , 42 , 45 , 
-48 , 51 , 54 , 57 , 59 , 62 , 65 , 67 , 70 , 73 , 75 , 78 , 80 , 82 , 85 , 87 , 
-89 , 91 , 94 , 96 , 98 , 100 , 102 , 103 , 105 , 107 , 108 , 110 , 112 , 113 , 114 , 116 , 
-117 , 118 , 119 , 120 , 121 , 122 , 123 , 123 , 124 , 125 , 125 , 126 , 126 , 126 , 126 , 126 , 
-127 , 126 , 126 , 126 , 126 , 126 , 125 , 125 , 124 , 123 , 123 , 122 , 121 , 120 , 119 , 118 , 
-117 , 116 , 114 , 113 , 112 , 110 , 108 , 107 , 105 , 103 , 102 , 100 , 98 , 96 , 94 , 91 , 
-89 , 87 , 85 , 82 , 80 , 78 , 75 , 73 , 70 , 67 , 65 , 62 , 59 , 57 , 54 , 51 , 
-48 , 45 , 42 , 39 , 36 , 33 , 30 , 27 , 24 , 21 , 18 , 15 , 12 , 9 , 6 , 3 , 
-0 , -3 , -6 , -9 , -12 , -15 , -18 , -21 , -24 , -27 , -30 , -33 , -36 , -39 , -42 , -45 , 
--48 , -51 , -54 , -57 , -59 , -62 , -65 , -67 , -70 , -73 , -75 , -78 , -80 , -82 , -85 , -87 , 
--89 , -91 , -94 , -96 , -98 , -100 , -102 , -103 , -105 , -107 , -108 , -110 , -112 , -113 , -114 , -116 , 
--117 , -118 , -119 , -120 , -121 , -122 , -123 , -123 , -124 , -125 , -125 , -126 , -126 , -126 , -126 , -126 , 
--127 , -126 , -126 , -126 , -126 , -126 , -125 , -125 , -124 , -123 , -123 , -122 , -121 , -120 , -119 , -118 , 
--117 , -116 , -114 , -113 , -112 , -110 , -108 , -107 , -105 , -103 , -102 , -100 , -98 , -96 , -94 , -91 , 
--89 , -87 , -85 , -82 , -80 , -78 , -75 , -73 , -70 , -67 , -65 , -62 , -59 , -57 , -54 , -51 , 
--48 , -45 , -42 , -39 , -36 , -33 , -30 , -27 , -24 , -21 , -18 , -15 , -12 , -9 , -6 , -3 
+0 , 3 , 6 , 9 , 12 , 15 , 18 , 21 , 24 , 27 , 30 , 33 , 36 , 39 , 42 , 45 ,
+48 , 51 , 54 , 57 , 59 , 62 , 65 , 67 , 70 , 73 , 75 , 78 , 80 , 82 , 85 , 87 ,
+89 , 91 , 94 , 96 , 98 , 100 , 102 , 103 , 105 , 107 , 108 , 110 , 112 , 113 , 114 , 116 ,
+117 , 118 , 119 , 120 , 121 , 122 , 123 , 123 , 124 , 125 , 125 , 126 , 126 , 126 , 126 , 126 ,
+127 , 126 , 126 , 126 , 126 , 126 , 125 , 125 , 124 , 123 , 123 , 122 , 121 , 120 , 119 , 118 ,
+117 , 116 , 114 , 113 , 112 , 110 , 108 , 107 , 105 , 103 , 102 , 100 , 98 , 96 , 94 , 91 ,
+89 , 87 , 85 , 82 , 80 , 78 , 75 , 73 , 70 , 67 , 65 , 62 , 59 , 57 , 54 , 51 ,
+48 , 45 , 42 , 39 , 36 , 33 , 30 , 27 , 24 , 21 , 18 , 15 , 12 , 9 , 6 , 3 ,
+0 , -3 , -6 , -9 , -12 , -15 , -18 , -21 , -24 , -27 , -30 , -33 , -36 , -39 , -42 , -45 ,
+-48 , -51 , -54 , -57 , -59 , -62 , -65 , -67 , -70 , -73 , -75 , -78 , -80 , -82 , -85 , -87 ,
+-89 , -91 , -94 , -96 , -98 , -100 , -102 , -103 , -105 , -107 , -108 , -110 , -112 , -113 , -114 , -116 ,
+-117 , -118 , -119 , -120 , -121 , -122 , -123 , -123 , -124 , -125 , -125 , -126 , -126 , -126 , -126 , -126 ,
+-127 , -126 , -126 , -126 , -126 , -126 , -125 , -125 , -124 , -123 , -123 , -122 , -121 , -120 , -119 , -118 ,
+-117 , -116 , -114 , -113 , -112 , -110 , -108 , -107 , -105 , -103 , -102 , -100 , -98 , -96 , -94 , -91 ,
+-89 , -87 , -85 , -82 , -80 , -78 , -75 , -73 , -70 , -67 , -65 , -62 , -59 , -57 , -54 , -51 ,
+-48 , -45 , -42 , -39 , -36 , -33 , -30 , -27 , -24 , -21 , -18 , -15 , -12 , -9 , -6 , -3
 };
 
 char square256[256]   __attribute__ ((aligned(256)))  = {
-127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 
-127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 
-127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 
-127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 
-127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 
-127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 
-127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 
-127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 
--127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , 
--127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , 
--127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , 
--127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , 
--127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , 
--127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , 
--127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , 
--127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 
+127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 ,
+127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 ,
+127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 ,
+127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 ,
+127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 ,
+127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 ,
+127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 ,
+127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 , 127 ,
+-127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 ,
+-127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 ,
+-127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 ,
+-127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 ,
+-127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 ,
+-127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 ,
+-127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 ,
+-127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127 , -127
 };
 char triangle256[256]   __attribute__ ((aligned(256)))  = {
--127 , -125 , -123 , -121 , -119 , -117 , -115 , -113 , -111 , -109 , -107 , -105 , -103 , -101 , -99 , -97 , 
--95 , -93 , -91 , -89 , -87 , -85 , -83 , -81 , -79 , -77 , -75 , -73 , -71 , -69 , -67 , -65 , 
--63 , -61 , -59 , -57 , -55 , -53 , -51 , -49 , -47 , -45 , -43 , -41 , -39 , -37 , -35 , -33 , 
--31 , -29 , -27 , -25 , -23 , -21 , -19 , -17 , -15 , -13 , -11 , -9 , -7 , -5 , -3 , -1 , 
-1 , 3 , 5 , 7 , 9 , 11 , 13 , 15 , 17 , 19 , 21 , 23 , 25 , 27 , 29 , 31 , 
-33 , 35 , 37 , 39 , 41 , 43 , 45 , 47 , 49 , 51 , 53 , 55 , 57 , 59 , 61 , 63 , 
-65 , 67 , 69 , 71 , 73 , 75 , 77 , 79 , 81 , 83 , 85 , 87 , 89 , 91 , 93 , 95 , 
-97 , 99 , 101 , 103 , 105 , 107 , 109 , 111 , 113 , 115 , 117 , 119 , 121 , 123 , 125 , 127 , 
-129 , 127 , 125 , 123 , 121 , 119 , 117 , 115 , 113 , 111 , 109 , 107 , 105 , 103 , 101 , 99 , 
-97 , 95 , 93 , 91 , 89 , 87 , 85 , 83 , 81 , 79 , 77 , 75 , 73 , 71 , 69 , 67 , 
-65 , 63 , 61 , 59 , 57 , 55 , 53 , 51 , 49 , 47 , 45 , 43 , 41 , 39 , 37 , 35 , 
-33 , 31 , 29 , 27 , 25 , 23 , 21 , 19 , 17 , 15 , 13 , 11 , 9 , 7 , 5 , 3 , 
-1 , -1 , -3 , -5 , -7 , -9 , -11 , -13 , -15 , -17 , -19 , -21 , -23 , -25 , -27 , -29 , 
--31 , -33 , -35 , -37 , -39 , -41 , -43 , -45 , -47 , -49 , -51 , -53 , -55 , -57 , -59 , -61 , 
--63 , -65 , -67 , -69 , -71 , -73 , -75 , -77 , -79 , -81 , -83 , -85 , -87 , -89 , -91 , -93 , 
--95 , -97 , -99 , -101 , -103 , -105 , -107 , -109 , -111 , -113 , -115 , -117 , -119 , -121 , -123 , -125 
+-127 , -125 , -123 , -121 , -119 , -117 , -115 , -113 , -111 , -109 , -107 , -105 , -103 , -101 , -99 , -97 ,
+-95 , -93 , -91 , -89 , -87 , -85 , -83 , -81 , -79 , -77 , -75 , -73 , -71 , -69 , -67 , -65 ,
+-63 , -61 , -59 , -57 , -55 , -53 , -51 , -49 , -47 , -45 , -43 , -41 , -39 , -37 , -35 , -33 ,
+-31 , -29 , -27 , -25 , -23 , -21 , -19 , -17 , -15 , -13 , -11 , -9 , -7 , -5 , -3 , -1 ,
+1 , 3 , 5 , 7 , 9 , 11 , 13 , 15 , 17 , 19 , 21 , 23 , 25 , 27 , 29 , 31 ,
+33 , 35 , 37 , 39 , 41 , 43 , 45 , 47 , 49 , 51 , 53 , 55 , 57 , 59 , 61 , 63 ,
+65 , 67 , 69 , 71 , 73 , 75 , 77 , 79 , 81 , 83 , 85 , 87 , 89 , 91 , 93 , 95 ,
+97 , 99 , 101 , 103 , 105 , 107 , 109 , 111 , 113 , 115 , 117 , 119 , 121 , 123 , 125 , 127 ,
+129 , 127 , 125 , 123 , 121 , 119 , 117 , 115 , 113 , 111 , 109 , 107 , 105 , 103 , 101 , 99 ,
+97 , 95 , 93 , 91 , 89 , 87 , 85 , 83 , 81 , 79 , 77 , 75 , 73 , 71 , 69 , 67 ,
+65 , 63 , 61 , 59 , 57 , 55 , 53 , 51 , 49 , 47 , 45 , 43 , 41 , 39 , 37 , 35 ,
+33 , 31 , 29 , 27 , 25 , 23 , 21 , 19 , 17 , 15 , 13 , 11 , 9 , 7 , 5 , 3 ,
+1 , -1 , -3 , -5 , -7 , -9 , -11 , -13 , -15 , -17 , -19 , -21 , -23 , -25 , -27 , -29 ,
+-31 , -33 , -35 , -37 , -39 , -41 , -43 , -45 , -47 , -49 , -51 , -53 , -55 , -57 , -59 , -61 ,
+-63 , -65 , -67 , -69 , -71 , -73 , -75 , -77 , -79 , -81 , -83 , -85 , -87 , -89 , -91 , -93 ,
+-95 , -97 , -99 , -101 , -103 , -105 , -107 , -109 , -111 , -113 , -115 , -117 , -119 , -121 , -123 , -125
 };
 char sawtooth256[256]   __attribute__ ((aligned(256))) = {
--127 , -127 , -126 , -125 , -124 , -123 , -122 , -121 , -120 , -119 , -118 , -117 , -116 , -115 , -114 , -113 , 
--112 , -111 , -110 , -109 , -108 , -107 , -106 , -105 , -104 , -103 , -102 , -101 , -100 , -99 , -98 , -97 , 
--96 , -95 , -94 , -93 , -92 , -91 , -90 , -89 , -88 , -87 , -86 , -85 , -84 , -83 , -82 , -81 , 
--80 , -79 , -78 , -77 , -76 , -75 , -74 , -73 , -72 , -71 , -70 , -69 , -68 , -67 , -66 , -65 , 
--64 , -63 , -62 , -61 , -60 , -59 , -58 , -57 , -56 , -55 , -54 , -53 , -52 , -51 , -50 , -49 , 
--48 , -47 , -46 , -45 , -44 , -43 , -42 , -41 , -40 , -39 , -38 , -37 , -36 , -35 , -34 , -33 , 
--32 , -31 , -30 , -29 , -28 , -27 , -26 , -25 , -24 , -23 , -22 , -21 , -20 , -19 , -18 , -17 , 
--16 , -15 , -14 , -13 , -12 , -11 , -10 , -9 , -8 , -7 , -6 , -5 , -4 , -3 , -2 , -1 , 
-0 , 1 , 2 , 3 , 4 , 5 , 6 , 7 , 8 , 9 , 10 , 11 , 12 , 13 , 14 , 15 , 
-16 , 17 , 18 , 19 , 20 , 21 , 22 , 23 , 24 , 25 , 26 , 27 , 28 , 29 , 30 , 31 , 
-32 , 33 , 34 , 35 , 36 , 37 , 38 , 39 , 40 , 41 , 42 , 43 , 44 , 45 , 46 , 47 , 
-48 , 49 , 50 , 51 , 52 , 53 , 54 , 55 , 56 , 57 , 58 , 59 , 60 , 61 , 62 , 63 , 
-64 , 65 , 66 , 67 , 68 , 69 , 70 , 71 , 72 , 73 , 74 , 75 , 76 , 77 , 78 , 79 , 
-80 , 81 , 82 , 83 , 84 , 85 , 86 , 87 , 88 , 89 , 90 , 91 , 92 , 93 , 94 , 95 , 
-96 , 97 , 98 , 99 , 100 , 101 , 102 , 103 , 104 , 105 , 106 , 107 , 108 , 109 , 110 , 111 , 
-112 , 113 , 114 , 115 , 116 , 117 , 118 , 119 , 120 , 121 , 122 , 123 , 124 , 125 , 126 , 127 
+-127 , -127 , -126 , -125 , -124 , -123 , -122 , -121 , -120 , -119 , -118 , -117 , -116 , -115 , -114 , -113 ,
+-112 , -111 , -110 , -109 , -108 , -107 , -106 , -105 , -104 , -103 , -102 , -101 , -100 , -99 , -98 , -97 ,
+-96 , -95 , -94 , -93 , -92 , -91 , -90 , -89 , -88 , -87 , -86 , -85 , -84 , -83 , -82 , -81 ,
+-80 , -79 , -78 , -77 , -76 , -75 , -74 , -73 , -72 , -71 , -70 , -69 , -68 , -67 , -66 , -65 ,
+-64 , -63 , -62 , -61 , -60 , -59 , -58 , -57 , -56 , -55 , -54 , -53 , -52 , -51 , -50 , -49 ,
+-48 , -47 , -46 , -45 , -44 , -43 , -42 , -41 , -40 , -39 , -38 , -37 , -36 , -35 , -34 , -33 ,
+-32 , -31 , -30 , -29 , -28 , -27 , -26 , -25 , -24 , -23 , -22 , -21 , -20 , -19 , -18 , -17 ,
+-16 , -15 , -14 , -13 , -12 , -11 , -10 , -9 , -8 , -7 , -6 , -5 , -4 , -3 , -2 , -1 ,
+0 , 1 , 2 , 3 , 4 , 5 , 6 , 7 , 8 , 9 , 10 , 11 , 12 , 13 , 14 , 15 ,
+16 , 17 , 18 , 19 , 20 , 21 , 22 , 23 , 24 , 25 , 26 , 27 , 28 , 29 , 30 , 31 ,
+32 , 33 , 34 , 35 , 36 , 37 , 38 , 39 , 40 , 41 , 42 , 43 , 44 , 45 , 46 , 47 ,
+48 , 49 , 50 , 51 , 52 , 53 , 54 , 55 , 56 , 57 , 58 , 59 , 60 , 61 , 62 , 63 ,
+64 , 65 , 66 , 67 , 68 , 69 , 70 , 71 , 72 , 73 , 74 , 75 , 76 , 77 , 78 , 79 ,
+80 , 81 , 82 , 83 , 84 , 85 , 86 , 87 , 88 , 89 , 90 , 91 , 92 , 93 , 94 , 95 ,
+96 , 97 , 98 , 99 , 100 , 101 , 102 , 103 , 104 , 105 , 106 , 107 , 108 , 109 , 110 , 111 ,
+112 , 113 , 114 , 115 , 116 , 117 , 118 , 119 , 120 , 121 , 122 , 123 , 124 , 125 , 126 , 127
 };
 
 
@@ -111,14 +116,14 @@ char sawtooth256[256]   __attribute__ ((aligned(256))) = {
 
 
 
-// log table for 128 filter cutoffs 
+// log table for 128 filter cutoffs
 unsigned char logCutoffs[128] = {0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x03,0x04,0x04,0x04,0x04,0x04,0x05,0x05,0x05,0x05,0x06,0x06,0x06,0x06,0x06,0x06,0x07,0x08,0x08,0x08,0x09,0x09,0x0A,0x0A,0x0A,0x0A,0x0B,0x0C,0x0C,0x0C,0x0C,0x0D,0x0E,0x0F,0x10,0x11,0x12,0x12,0x13,0x14,0x15,0x16,0x17,0x18,0x19,0x1A,0x1B,0x1C,0x1E,0x20,0x21,0x22,0x23,0x24,0x26,0x28,0x2A,0x2C,0x2E,0x30,0x32,0x34,0x36,0x38,0x3A,0x40,0x42,0x44,0x48,0x4C,0x4F,0x52,0x55,0x58,0x5D,0x61,0x65,0x68,0x6C,0x70,0x76,0x7E,0x85,0x8A,0x90,0x96,0x9D,0xA4,0xAB,0xB0,0xBA,0xC4,0xCE,0xD8,0xE0,0xE8,0xF4,0xFF};
 
 volatile unsigned int WAIT_curTime;
 #define WAIT_UNTIL_INTERRUPT()     WAIT_curTime=loopSteps;    while(WAIT_curTime==loopSteps){}
 
 
-#define SERIAL_OUT 0 
+#define SERIAL_OUT 0
 
 // attack,decay are in 1/64ths per 125th of a second - ie. 1 = 0->1 in half a second
 const int DECAY=3;
@@ -138,7 +143,7 @@ volatile char* curWave=square256;
 
 
 // variables used inside interrupt service declared as voilatile
-// these variables allow you to keep track of time - as delay / millis etc. are 
+// these variables allow you to keep track of time - as delay / millis etc. are
 // made inactive due to interrupts being disabled.
 volatile unsigned char loopSteps=0; // once per sample
 volatile unsigned int loopStepsHigh=0; // once per 256 samples
@@ -154,7 +159,7 @@ struct oscillatorPhase
 // the oscillators (8 of them)
 struct oscillatorPhase oscillators[8];
 
-//  tword_m=pow(2,32)*dfreq/refclk;  // calulate DDS new tuning word 
+//  tword_m=pow(2,32)*dfreq/refclk;  // calulate DDS new tuning word
 // to get hz -> tuning word do: (pow(2,16) * frequency) / 31376.6
 const unsigned int NOTE_FREQS[25]={273,289,307,325,344,365,386,409,434,460,487,516,546,579,613,650,688,729,773,819,867,919,974,1032,1093};
 
@@ -165,11 +170,11 @@ inline int getNoteKeys(boolean calibrate=false)
 {
 
   char PORTD_PINS=0b11000000; // (pins 6-7 - avoid pins 0,1 as they are used for serial port comms)
-  char PORTC_PINS=0b111111; //(analog pins 0-5)  
+  char PORTC_PINS=0b111111; //(analog pins 0-5)
 
   const int MAX_LOOPS=16;
   char port_values[MAX_LOOPS*2];
-  
+
   WAIT_UNTIL_INTERRUPT();
   asm volatile (
   // port D reading loop:
@@ -261,7 +266,7 @@ inline int getNoteKeys(boolean calibrate=false)
   "=r" (port_values[25]),
   "=r" (port_values[27]),
   "=r" (port_values[29]),
-  "=r" (port_values[31])  
+  "=r" (port_values[31])
   :[temp] "d" (0));
 
   PORTC &= ~(PORTC_PINS); // pullup off pins 8-12
@@ -270,7 +275,7 @@ inline int getNoteKeys(boolean calibrate=false)
   DDRD |= (PORTD_PINS); // discharge
 
   if(calibrate)
-  {      
+  {
     for(int c=0;c<8;c++)
     {
       for(int d=0;d<MAX_LOOPS;d++)
@@ -300,11 +305,11 @@ inline int getNoteKeys(boolean calibrate=false)
         liveNotes|=(1<<c);
       }
   }
-  return liveNotes;  
+  return liveNotes;
 }
 
 // get capacitive touch on input 4 and output 3
-// used for filter modulator  
+// used for filter modulator
 inline int getfiltermodulationtime()
 {
     static int running_average=0;
@@ -322,7 +327,7 @@ inline int getfiltermodulationtime()
     DDRD&=~(PIN_IN);
     WAIT_UNTIL_INTERRUPT();
     PORTD|=PIN_OUT;
-    asm volatile ( 
+    asm volatile (
          "loopstart%=:" "\n\t"
          "sbic 0x09,%[PINNUM_IN]" "\n\t"
          "rjmp outloop%=" "\n\t"
@@ -336,7 +341,7 @@ inline int getfiltermodulationtime()
     // much accuracy?
     WAIT_UNTIL_INTERRUPT();
     PORTD&=~PIN_OUT;
-    asm( 
+    asm(
          "loopstart%=:" "\n\t"
          "sbis 0x09,%[PINNUM_IN]" "\n\t"
          "rjmp outloop%=" "\n\t"
@@ -357,7 +362,7 @@ inline int getfiltermodulationtime()
         initialise_running_min=false;
       }else{
         running_min_inc_count=0;
-        running_min++;     
+        running_min++;
       }
     }
     if(running_average<running_min)
@@ -380,7 +385,7 @@ inline int getfiltermodulationtime()
 
 
 // get capacitive touch on input 5 and output 3
-// used for pitch bend 
+// used for pitch bend
 inline int getpitchbendtime()
 {
     static int running_average=0;
@@ -398,7 +403,7 @@ inline int getpitchbendtime()
     DDRD&=~(PIN_IN);
     WAIT_UNTIL_INTERRUPT();
     PORTD|=PIN_OUT;
-    asm volatile ( 
+    asm volatile (
          "loopstart%=:" "\n\t"
          "sbic 0x09,%[PINNUM_IN]" "\n\t"
          "rjmp outloop%=" "\n\t"
@@ -412,7 +417,7 @@ inline int getpitchbendtime()
     // much accuracy?
     WAIT_UNTIL_INTERRUPT();
     PORTD&=~PIN_OUT;
-    asm( 
+    asm(
          "loopstart%=:" "\n\t"
          "sbis 0x09,%[PINNUM_IN]" "\n\t"
          "rjmp outloop%=" "\n\t"
@@ -433,7 +438,7 @@ inline int getpitchbendtime()
         initialise_running_min=false;
       }else{
         running_min_inc_count=0;
-        running_min++;     
+        running_min++;
       }
     }
     if(running_average<running_min)
@@ -519,7 +524,7 @@ void setupNoteFrequencies(int baseNote,int pitchBendVal /*-100 -> 100*/)
 //  Serial.print(NOTE_FREQS[baseNote]);
 //  Serial.print(":");
 //  Serial.println(oscillators[0].phaseStep);
-  
+
 }
 
 void setup()
@@ -574,33 +579,33 @@ void setup()
     {
       if(notes[note]&(1<<c))
       {
-           oscillators[c].volume=63/noteCount; 
+           oscillators[c].volume=63/noteCount;
       }else
       {
-           oscillators[c].volume=0; 
+           oscillators[c].volume=0;
       }
     }
     for(int c=0;c<50;c++)
     {
       // might as well keep calibrating here
       // nb: each calibration loop = at least 1 interrupt
-      
+
       getNoteKeys(true);
       #ifndef FILTER_LPF_NONE
         setFilter(127-c, 64);
       #endif
-      
+
     }
   }
 #else
   // just beep to show calibration is done
-    oscillators[0].volume=63; 
+    oscillators[0].volume=63;
     for(int c=0;c<20;c++)
     {
       WAIT_UNTIL_INTERRUPT();
     }
-    oscillators[0].volume=63; 
-  
+    oscillators[0].volume=63;
+
 #endif
   Serial.println("Calibrations:");
   for(int c=0;c<8;c++)
@@ -626,14 +631,14 @@ void loop()
   int sweepDir=SWEEP_SPEED;
   unsigned int lastStep=loopStepsHigh;
   unsigned curStep=loopStepsHigh;
-  while(1) 
+  while(1)
   {
     lastStep=curStep;
     curStep=loopStepsHigh;
     // NOTE: timers do not work in this code (interrupts disabled / speeds changed), so don't even think about calling: delay(), millis / micros etc.
     // each loopstep is roughly 31250 / second
     // this main loop will get called once every 3 or 4 samples if the serial output is turned off, maybe slower otherwise
-    
+
     int liveNotes=getNoteKeys();
     // we are right after an interrupt (as loopStep has just been incremented)
     // so we should have enough time to do the capacitative key checks
@@ -698,12 +703,12 @@ void loop()
     #endif
     WAIT_UNTIL_INTERRUPT();
     setupNoteFrequencies(12,-getpitchbendtime());
-    
+
     // we are right after an interrupt again (as loopStep has just been incremented)
     // so we should have enough time to check the pitch bend capacitance without going over another sample, timing is quite important here
     // need to balance using a big enough resistor to get decent sensing distance with taking too long to sample
     // check the pitch bend input
-    
+
   }
  }
 //******************************************************************
@@ -732,7 +737,7 @@ volatile char filtCoeffB1=127;
 volatile unsigned char filtCoeffB2=255;
 #endif
 #ifdef FILTER_LPF_HACK
-// hacked low pass filter - 2 pole resonant - 
+// hacked low pass filter - 2 pole resonant -
 // a += f*((in-a)+ q*(a-b)
 // b+= f* (a-b)
 int filterA=0;
@@ -753,7 +758,7 @@ inline void setFilterRaw(unsigned char filterF, unsigned char resonance)
       "ldi %[reso],0x00" "\n\t"
       "Res_Overflow%=:" "\n\t"
       "mov %[filtQ],%[reso]" "\n\t"
-  :[tempReg] "=&d" (tempReg),[tempReg2] "=&d" (tempReg2),[filtQ] "=&d" (filterQ): [reso] "d" (resonance), [filtF] "d" (filterF) ); 
+  :[tempReg] "=&d" (tempReg),[tempReg2] "=&d" (tempReg2),[filtQ] "=&d" (filterQ): [reso] "d" (resonance), [filtF] "d" (filterF) );
 }
 
 inline void setFilter(unsigned char f, unsigned char resonance)
@@ -773,22 +778,22 @@ inline void setFilter(unsigned char f, unsigned char resonance)
 // 13 instructions - should take 14 processor cycles according to the datasheet
 // in theory I think this means that each oscillator should take 1.5% of cpu
 // (plus a constant overhead for interrupt calls etc.)
-// Note: this used to do all the stepvolume loads near the start, but they are now interleaved in the 
-// code, this is because ldd (load with offset) takes 2 instructions, 
+// Note: this used to do all the stepvolume loads near the start, but they are now interleaved in the
+// code, this is because ldd (load with offset) takes 2 instructions,
 // versus ld,+1 (load with post increment) and st,+1 which are 1 instruction - we can do this because:
 //
-// a)the step (which doesn't need to be stored back) is in memory before the 
+// a)the step (which doesn't need to be stored back) is in memory before the
 //   phase accumulator (which does need to be stored back once the step is added
 //
 // b)the phase assumulator is stored in low byte, high byte order, meaning that we
 //   can add the first bytes together, then store that byte incrementing the pointer,
 //   then load the high byte, add the high bytes together and store incrementing the pointer
-//   
+//
 // I think this is the minimum number of operations possible to code this oscillator in, because
 // 1)There are 6 load operations required (to load stepHigh/Low,phaseH/L,volume, and the value from the wave)
 // 2)There are 2 add operations required to add to the phase accumulator
 // 3)There are 2 store operations required to save the phase accumulator
-// 4)There is 1 multiply (2 instruction cycles) required to do the volume 
+// 4)There is 1 multiply (2 instruction cycles) required to do the volume
 // 5)There are 2 add operations required to add to the final output
 //
 // 6+2+2+2+2 = 14 instruction cycles
@@ -801,7 +806,7 @@ inline void setFilter(unsigned char f, unsigned char resonance)
     /* load phase accumulator - high byte goes straight*/ \
     /* into the wave lookup array (wave is on 256 byte boundary*/ \
     /* so we can do this without any adds */ \
-    /* Do the phase adds in between the two loads, as load with offset is slower than 
+    /* Do the phase adds in between the two loads, as load with offset is slower than
        just a normal load
     */\
     "ld %A[tempPhaseLow],%a[stepVolume]" "\n\t" \
@@ -824,7 +829,7 @@ inline void setFilter(unsigned char f, unsigned char resonance)
     "adc %B[outValue],r1" "\n\t" \
     /* go to next oscillator - stepVolume is pointing at next*/ \
     /* oscillator already */  \
-    
+
 
 
 //******************************************************************
@@ -867,7 +872,7 @@ ISR(TIMER2_OVF_vect) {
     "lds %A[phaseAccu],0x0a" "\n\t"
     "lds %B[phaseAccu],0x0b" "\n\t"
     "lds %A[stepVolume],0x0c" "\n\t"
-    "lds %B[stepVolume],0x0d" "\n\t"    
+    "lds %B[stepVolume],0x0d" "\n\t"
     "lds %A[waveBase],0x0e" "\n\t"
     "lds %B[waveBase],0x0f" "\n\t"*/
     OSCILLATOR_ASM
@@ -890,14 +895,14 @@ ISR(TIMER2_OVF_vect) {
     [waveBase] "z" (256*(((unsigned int)curWave)>>8))
     :
     // other registers we clobber (by doing multiplications)
-    "r1"    
+    "r1"
     );
-    
-    // at this point outValue = oscillator value 
+
+    // at this point outValue = oscillator value
     // it is currently maxed to full volume / 4
-    // to allow some headroom for filtering 
-    
-    
+    // to allow some headroom for filtering
+
+
 #ifdef FILTER_LPF_HACK
 
 // a low pass filter based on the one from MeeBlip (http://meeblip.noisepages.com)
@@ -917,7 +922,7 @@ ISR(TIMER2_OVF_vect) {
       "brvc No_overflow1%=" "\n\t"
       "ldi %A[outVal],0b00000001" "\n\t"
       "ldi %B[outVal],0b10000000" "\n\t"
-      "No_overflow1%=:" "\n\t"     
+      "No_overflow1%=:" "\n\t"
       // outVal = (in - filtA)
       "mov %A[tempReg],%A[filtA]" "\n\t"
       "mov %B[tempReg],%B[filtA]" "\n\t"
@@ -926,7 +931,7 @@ ISR(TIMER2_OVF_vect) {
       "brvc No_overflow3%=" "\n\t"
       "ldi %A[tempReg],0b00000001" "\n\t"
       "ldi %B[tempReg],0b10000000" "\n\t"
-      "No_overflow3%=:" "\n\t"     
+      "No_overflow3%=:" "\n\t"
       // tempReg = (a-b)
       "mulsu %B[tempReg],%[filtQ]" "\n\t"
       "movw %A[tempReg2],r0" "\n\t"
@@ -937,7 +942,7 @@ ISR(TIMER2_OVF_vect) {
       "rol r0" "\n\t"
       "brcc No_Round1%=" "\n\t"
       "inc %A[tempReg2]" "\n\t"
-      "No_Round1%=:" "\n\t"     
+      "No_Round1%=:" "\n\t"
       // at this point tempReg2 = (a-b)*Q (shifted appropriately and rounded)
 //      "clc" "\n\t"
       "lsl %A[tempReg2]" "\n\t"
@@ -945,13 +950,13 @@ ISR(TIMER2_OVF_vect) {
  //     "clc" "\n\t"
       "lsl %A[tempReg2]" "\n\t"
       "rol %B[tempReg2]" "\n\t"
-      // tempReg2 = (a-b)*Q*4 
+      // tempReg2 = (a-b)*Q*4
       "add %A[outVal],%A[tempReg2]" "\n\t"
       "adc %B[outVal],%B[tempReg2]" "\n\t"
       "brvc No_overflow4%=" "\n\t"
       "ldi %A[outVal],0b11111111" "\n\t"
       "ldi %B[outVal],0b01111111" "\n\t"
-      "No_overflow4%=:" "\n\t"     
+      "No_overflow4%=:" "\n\t"
       // outVal = ((in-a) + (a-b)*(Q>>8)*4) - clipped etc
       "mulsu %B[outVal],%[filtF]" "\n\t"
       "movw %A[tempReg],r0" "\n\t"
@@ -969,7 +974,7 @@ ISR(TIMER2_OVF_vect) {
       "brvc No_overflow5%=" "\n\t"
       "ldi %A[outVal],0b11111111" "\n\t"
       "ldi %B[outVal],0b01111111" "\n\t"
-      "No_overflow5%=:" "\n\t"     
+      "No_overflow5%=:" "\n\t"
       // now calculate B= f* (a - b)
 
       "mov %A[tempReg],%A[filtA]" "\n\t"
@@ -992,16 +997,16 @@ ISR(TIMER2_OVF_vect) {
       "brvc No_overflow7%=" "\n\t"
       "ldi %A[filtB],0b11111111" "\n\t"
       "ldi %B[filtB],0b01111111" "\n\t"
-      "No_overflow7%=:" "\n\t"     
+      "No_overflow7%=:" "\n\t"
       // now b= b+f*(a-b)
-      "mov %A[outVal],%A[filtB]" "\n\t"     
+      "mov %A[outVal],%A[filtB]" "\n\t"
       "mov %B[outVal],%B[filtB]" "\n\t"
-      
+
       // multiply outval by 4 and clip
       "add %A[outVal],%A[filtB]" "\n\t"
       "adc %B[outVal],%B[filtB]" "\n\t"
       "brbs 3, Overflow_End%=" "\n\t"
-      
+
       "add %A[outVal],%A[filtB]" "\n\t"
       "adc %B[outVal],%B[filtB]" "\n\t"
       "brbs 3, Overflow_End%=" "\n\t"
@@ -1051,23 +1056,23 @@ ISR(TIMER2_OVF_vect) {
     [outVal] "a" (outValue),
 [ZERO] "d" (zeroRegFilt)
   // inputs
-  : "r1"); 
+  : "r1");
 
 
 #endif
-    
-// output is done in the filter assembler code if filters are on    
+
+// output is done in the filter assembler code if filters are on
 // otherwise we output it by hand here
-#ifdef FILTER_LPF_NONE    
-    // full gain     
+#ifdef FILTER_LPF_NONE
+    // full gain
     outValue*=4;
     // at this point, outValue is a 16 bit signed version of what we want ie. 0 -> 32767, then -32768 -> -1 (0xffff)
     // we want 0->32767 to go to 32768-65535 and -32768 -> -1 to go to 0-32767, then we want only the top byte
-    // take top byte, then add 128, then cast to unsigned. The (unsigned int) in the below is to avoid having to shift (ie.just takes top byte)     
+    // take top byte, then add 128, then cast to unsigned. The (unsigned int) in the below is to avoid having to shift (ie.just takes top byte)
     char valOut=((unsigned int)(outValue))>>8;
     valOut+=128;
     OCR2A=(byte)valOut;
-#endif     
+#endif
     // increment loop step counter (and high counter)
     // these are used because we stop the timer
     // interrupt running, so have no other way to tell time
@@ -1080,5 +1085,5 @@ ISR(TIMER2_OVF_vect) {
         "brbc 1,loopend%=" "\n\t"
         "inc %B[loopStepsHigh]" "\n\t"
         "loopend%=:" "\n\t"
-          :[loopSteps] "+a" (loopSteps),[loopStepsHigh] "+a" (loopStepsHigh):);    
-} 
+          :[loopSteps] "+a" (loopSteps),[loopStepsHigh] "+a" (loopStepsHigh):);
+}
